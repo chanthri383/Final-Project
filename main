@@ -1,0 +1,785 @@
+Tetris.java
+
+import java.awt.Color;
+import java.awt.Font;
+import java.awt.Graphics;
+
+import javax.swing.JFrame;
+import javax.swing.JPanel;
+public class Tetris extends JPanel {
+
+   private Game game;
+
+   /**
+   * Sets up the parts for the Tetris game, display and user control
+   */
+   public Tetris() {
+       game = new Game(this);
+       JFrame f = new JFrame("The Tetris Game");
+       f.add(this);
+       f.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
+       f.setSize(400, 550);
+       f.setVisible(true);
+       EventController ec = new EventController(game);
+       f.addKeyListener(ec);
+       setBackground(Color.YELLOW);
+   }
+
+   /**
+   * Updates the display
+   */
+   public void update() {
+       repaint();
+   }
+
+   /**
+   * Paint the current state of the game
+   */
+   public void paintComponent(Graphics g) {
+       super.paintComponent(g);
+       game.draw(g);
+       if (game.isGameOver()) {
+           g.setFont(new Font("Palatino", Font.BOLD, 40));
+           g.setColor(Color.BLACK);
+           g.drawString("GAME OVER", 80, 300);
+       }
+   }
+
+   public static void main(String[] args) {
+       new Tetris();
+   }
+
+}
+
+
+Game.java
+
+import java.awt.Color;
+import java.awt.Graphics;
+import java.awt.Point;
+import java.util.Random;
+
+public class Game {
+
+   private Grid grid; // the grid that makes up the Tetris board
+
+   private Tetris display; // the visual for the Tetris game
+
+   private Piece piece; // the current piece that is dropping CHANGE BACK To LSHAPE
+
+   private boolean isOver; // has the game finished?
+
+   public Game(Tetris display) {
+       grid = new Grid();
+       this.display = display;
+       piece = new LShape(1, Grid.WIDTH / 2 - 1, grid);
+       isOver = false;
+   }
+
+   public void draw(Graphics g) {
+       grid.draw(g);
+       if (piece != null) {
+           piece.draw(g);
+       }
+   }
+
+   public void movePiece(Direction direction) {
+       if (piece != null) {
+           piece.move(direction);
+       }
+       updatePiece();
+        grid.checkRows();
+        display.update();
+      
+              
+   }
+
+   /**
+   * Returns true if the game is over
+   */
+   public boolean isGameOver() {
+       // game is over if the piece occupies the same space as some non-empty
+       // part of the grid. Usually happens when a new piece is made
+       if (piece == null) {
+           return false;
+       }
+
+       // check if game is already over
+       if (isOver) {
+           return true;
+       }
+
+       // check every part of the piece
+       Point[] p = piece.getLocations();
+       for (int i = 0; i < p.length; i++) {
+           if (grid.isSet((int) p[i].getX(), (int) p[i].getY())) {
+               isOver = true;
+               return true;
+           }
+       }
+       return false;
+   }
+
+   /** Updates the piece */
+   private void updatePiece() {
+       if (piece == null) {
+           //create new LShape piece here
+           Random random = new Random();
+           int currentNum = random.nextInt(7);
+           switch(currentNum) {
+           case 0:
+               piece = new ZShape(1, Grid.WIDTH/2 -1, grid);
+               break;
+           case 1:
+               piece = new SquareShape(1, Grid.WIDTH/2 -1, grid);
+               break;
+           case 2:
+               piece = new JShape(1, Grid.WIDTH/2 -1, grid);
+               break;
+           case 3:
+               piece = new TShape(1, Grid.WIDTH/2 -1, grid);
+               break;
+           case 4:
+               piece = new SShape(1, Grid.WIDTH/2 -1, grid);
+               break;
+           case 5:
+               piece = new BarShape(1, Grid.WIDTH/2 -1, grid);
+               break;
+           case 6:
+               piece = new LShape(1, Grid.WIDTH/2 -1, grid);
+               break;
+          
+           }
+          
+       }
+
+       // set Grid positions corresponding to frozen piece
+       // and then release the piece
+       else if (!piece.canMove(Direction.DOWN)) {
+           Point[] p = piece.getLocations();
+           Color c = piece.getColor();
+           for (int i = 0; i < p.length; i++) {
+               grid.set((int) p[i].getX(), (int) p[i].getY(), c);
+           }
+           piece = null;
+       }
+
+   }
+
+            /** Rotate the piece*/
+        public void rotatePiece()
+        {
+            if (piece != null) {
+                            piece.rotate();
+                    }
+                    updatePiece();
+            grid.checkRows();
+            display.update();
+        }
+
+
+}
+
+LShape.java
+
+import java.awt.Color;
+import java.awt.Graphics;
+import java.awt.Point;
+
+
+public class LShape extends AbstractPiece {
+   public LShape(int r, int c, Grid g) {
+       grid = g;
+       square = new Square[PIECE_COUNT];
+       ableToMove = true;
+
+       // Create the squares
+       square[0] = new Square(g, r - 1, c, Color.magenta, true);
+       square[1] = new Square(g, r, c, Color.magenta, true);
+       square[2] = new Square(g, r + 1, c, Color.magenta, true);
+       square[3] = new Square(g, r + 1, c + 1, Color.magenta, true);
+   }
+}
+
+
+AbstractPiece.java
+
+import java.awt.Color;
+import java.awt.Graphics;
+import java.awt.Point;
+
+public abstract class AbstractPiece implements Piece {
+  
+   protected boolean ableToMove;// can this piece move
+   protected Square[] square; // the squares that make up this piece
+                               // Made up of PIECE_COUNT squares
+   protected Grid grid;        // the board this piece is on
+                                // number of squares in one Tetris game piece
+   protected static final int PIECE_COUNT = 4;
+
+   /**
+   * Draws the piece on the given Graphics context
+   */
+   public void draw(Graphics g) {
+       for (int i = 0; i < PIECE_COUNT; i++) {
+           square[i].draw(g);
+       }
+   }
+
+   public void move(Direction direction) {
+       if (canMove(direction)) {
+           for (int i = 0; i < PIECE_COUNT; i++)
+               square[i].move(direction);
+       }
+       // if we couldn't move, see if because we're at the bottom
+       else if (direction == Direction.DOWN) {
+           ableToMove = false;
+       }
+   }
+
+   /**
+   * Returns the (row,col) grid coordinates occupied by this Piece
+   *
+   * @return an Array of (row,col) Points
+   */
+   public Point[] getLocations() {
+       Point[] points = new Point[PIECE_COUNT];
+       for (int i = 0; i < PIECE_COUNT; i++) {
+           points[i] = new Point(square[i].getRow(), square[i].getCol());
+       }
+       return points;
+   }
+
+   /**
+   * Return the color of this piece
+   */
+   public Color getColor() {
+       // all squares of this piece have the same color
+       return square[0].getColor();
+   }
+
+   /**
+   * Returns if this piece can move in the given direction
+   *
+   */
+   public boolean canMove(Direction direction) {
+       if (!ableToMove)
+           return false;
+
+       // Each square must be able to move in that direction
+       boolean answer = true;
+       for (int i = 0; i < PIECE_COUNT; i++) {
+           answer = answer && square[i].canMove(direction);
+       }
+
+       return answer;
+   }
+   /**
+   * Rotate the Piece
+   */
+   public void rotate()
+   {
+       boolean check = true;
+       for(int i = 0; i < PIECE_COUNT; i++)
+       {   if (i == 1)
+           {
+               ;
+           }
+       else   {
+           int py = square[1].getRow();
+           int px = square[1].getCol();
+           int y1 = square[i].getRow();
+           int x1 = square[i].getCol();
+           int x2 = y1 + px - py;
+           int y2 = x1 + px - px;
+           if ((0 <= x2)&&(x2 <= Grid.WIDTH) && (0 <= y2) && (y2 <= Grid.HEIGHT))
+           {
+               continue;
+           }
+           else
+               check = false;
+           }
+       }
+       if (check == true)
+       {
+           for(int i = 0; i < PIECE_COUNT; i++)
+           {
+               if(i == 1)
+               {
+                   ;
+               }
+               else   {
+               int py = square[1].getRow();
+               int px = square[1].getCol();
+               int y1 = square[i].getRow();
+               int x1 = square[i].getCol();
+               int x2 =px + py - y1;
+               int y2 = x1 + py - px;
+               square[i].setCol(x2);
+               square[i].setRow(y2);
+               }
+  
+           }
+       }
+   }
+}
+
+Piece.java
+
+import java.awt.Color;
+import java.awt.Graphics;
+import java.awt.Point;
+
+public interface Piece {
+
+   public void draw(Graphics g);
+   public void move(Direction direction);
+   public Point[] getLocations();
+   public Color getColor();
+   public boolean canMove(Direction direction);
+   public void rotate();
+}
+
+Direction.java
+
+public enum Direction {
+   UP, LEFT, RIGHT, DOWN
+}
+
+Square.java
+
+import java.awt.Color;
+import java.awt.Graphics;
+
+
+public class Square {
+   private Grid grid; // the environment where this Square is
+
+   private int row, col; // the grid location of this Square
+
+   private boolean ableToMove; // true if this Square can move
+
+   private Color color; // the color of this Square
+
+   // possible move directions are defined by the Game class
+
+   // dimensions of a Square
+   public static final int WIDTH = 20;
+
+   public static final int HEIGHT = 20;
+
+   public Square(Grid g, int row, int col, Color c, boolean mobile) {
+       if (row < 0 || row > Grid.HEIGHT - 1)
+           throw new IllegalArgumentException("Invalid row =" + row);
+       if (col < 0 || col > Grid.WIDTH - 1)
+           throw new IllegalArgumentException("Invalid column = " + col);
+
+       // initialize instance variables
+       grid = g;
+       this.row = row;
+       this.col = col;
+       color = c;
+       ableToMove = mobile;
+   }
+   public void setRow(int newRow)   {
+       this.row = newRow;
+   }
+  
+   public int getRow() {
+       return row;
+   }
+  
+   public void setCol(int newCol)   {
+       this.col = newCol;
+   }
+   public int getCol() {
+       return col;
+   }
+
+   public boolean canMove(Direction direction) {
+       if (!ableToMove)
+           return false;
+
+       boolean move = true;
+       // if the given direction is blocked, we can't move
+       // remember to check the edges of the grid
+       switch (direction) {
+       case DOWN:
+           if (row == (Grid.HEIGHT - 1) || grid.isSet(row + 1, col))
+               move = false;
+           break;
+
+       // currently doesn't support checking LEFT or RIGHT
+       // MODIFY so that it correctly returns if it can move left or right
+       case LEFT:
+                        if(col==0 || grid.isSet(row, col-1))
+                            move=false;
+                        break;
+       case RIGHT:
+                        // INSERT YOUR CODE HERE
+                       if(col == 0 || grid.isSet(row, col+1))
+                           move = false;
+                        break;
+       case UP:
+                   //NOTHING YET
+                        break;
+       }
+       return move;
+   }
+
+   public void move(Direction direction) {
+       if (canMove(direction)) {
+           switch (direction) {
+           case DOWN:
+               row++;
+               break;
+            case LEFT:
+                col--;
+                break;
+           case RIGHT:
+             //INSERT YOUR CODE HERE
+                col++;
+                break;
+           case UP:
+                //nothing here yet
+                break;
+           }
+       }
+   }
+
+   public void setColor(Color c) {
+       color = c;
+   }
+
+   /**
+   * Gets the color of this square
+   */
+   public Color getColor() {
+       return color;
+   }
+
+   /**
+   * Draws this square on the given graphics context
+   */
+   public void draw(Graphics g) {
+
+       // calculate the upper left (x,y) coordinate of this square
+       int actualX = Grid.LEFT + col * WIDTH;
+       int actualY = Grid.TOP + row * HEIGHT;
+       g.setColor(color);
+       g.fillRect(actualX, actualY, WIDTH, HEIGHT);
+       // black border (if not empty)
+       if (!color.equals(Grid.EMPTY)) {
+           g.setColor(Color.BLACK);
+           g.drawRect(actualX, actualY, WIDTH, HEIGHT);
+       }
+   }
+}
+
+Grid.java
+
+import java.awt.Color;
+import java.awt.Graphics;
+
+
+public class Grid {
+   private Square[][] board;
+
+   // Width and Height of Grid in number of squares
+   public static final int HEIGHT = 20;
+
+   public static final int WIDTH = 10;
+
+   private static final int BORDER = 5;
+
+   public static final int LEFT = 100; // pixel position of left of grid
+
+   public static final int TOP = 50; // pixel position of top of grid
+
+   public static final Color EMPTY = Color.WHITE;
+
+   /**
+   * Creates the grid
+   */
+   public Grid() {
+       board = new Square[HEIGHT][WIDTH];
+
+       // put squares in the board
+       for (int row = 0; row < HEIGHT; row++) {
+           for (int col = 0; col < WIDTH; col++) {
+               board[row][col] = new Square(this, row, col, EMPTY, false);
+
+           }
+       }
+
+   }
+   public boolean isSet(int row, int col) {
+       return !board[row][col].getColor().equals(EMPTY);
+   }
+
+   public void set(int row, int col, Color c) {
+       board[row][col].setColor(c);
+   }
+
+        private void removeRow(int r)
+        {
+            //change color of that row to white
+            for (int col = 0; col < WIDTH; col++) {
+                            set(r,col,EMPTY);
+            }
+
+            //move the rest of the thing down
+            for (int row = r-1; row >= 0; row--) {
+                for (int col = 0; col < WIDTH; col++) {
+                    if(isSet(row,col))
+                    {
+                        Color c = board[row][col].getColor();
+                        board[row][col].setColor(EMPTY);
+                        board[row+1][col].setColor(c);
+                    }
+
+                }
+            }
+        }
+
+
+        public void checkRows() {
+            int col,row;
+            for (row = 0; row< HEIGHT; row++) {
+                for( col = 0; col < WIDTH; col++) {
+                    if(!isSet(row,col)) break;
+                }
+                if(col == WIDTH) // a row is found
+                {
+                    removeRow(row);
+                }
+            }
+
+        }
+
+   /**
+   * Draws the grid on the given Graphics context
+   */
+   public void draw(Graphics g) {
+
+       // draw the edges as rectangles: left, right in blue then bottom in red
+       g.setColor(Color.BLUE);
+       g.fillRect(LEFT - BORDER, TOP, BORDER, HEIGHT * Square.HEIGHT);
+       g.fillRect(LEFT + WIDTH * Square.WIDTH, TOP, BORDER, HEIGHT
+               * Square.HEIGHT);
+       g.setColor(Color.RED);
+       g.fillRect(LEFT - BORDER, TOP + HEIGHT * Square.HEIGHT, WIDTH
+               * Square.WIDTH + 2 * BORDER, BORDER);
+
+       // draw all the squares in the grid
+       // empty ones first (to avoid masking the black lines of the pieces that have already fallen)
+       for (int r = 0; r < HEIGHT; r++) {
+           for (int c = 0; c < WIDTH; c++) {
+               if (board[r][c].getColor().equals(EMPTY)) {
+                   board[r][c].draw(g);
+               }
+           }
+       }
+       for (int r = 0; r < HEIGHT; r++) {
+           for (int c = 0; c < WIDTH; c++) {
+               if (!board[r][c].getColor().equals(EMPTY)) {
+                   board[r][c].draw(g);
+               }
+           }
+       }
+   }
+}
+
+BarShape.java
+
+import java.awt.Color;
+
+public class BarShape extends AbstractPiece {
+  
+   public BarShape(int r, int c, Grid g) {
+       grid = g;
+       square = new Square[PIECE_COUNT];
+       ableToMove = true;
+
+       // Create the squares
+       square[0] = new Square(g, r, c - 1, Color.cyan, true);
+       square[1] = new Square(g, r, c, Color.cyan, true);
+       square[2] = new Square(g, r, c + 1, Color.cyan, true);
+       square[3] = new Square(g, r, c + 2, Color.cyan, true);
+   }
+
+}
+
+JShape.java
+
+import java.awt.Color;
+
+public class JShape extends AbstractPiece {
+
+   public JShape(int r, int c, Grid g) {
+       grid = g;
+       square = new Square[PIECE_COUNT];
+       ableToMove = true;
+
+       // Create the squares
+       square[0] = new Square(g, r - 1, c, Color.blue, true);
+       square[1] = new Square(g, r, c, Color.blue, true);
+       square[2] = new Square(g, r + 1, c, Color.blue, true);
+       square[3] = new Square(g, r + 1, c - 1, Color.blue, true);
+   }
+}
+
+ZShape.java
+
+import java.awt.Color;
+
+public class ZShape extends AbstractPiece{
+
+   public ZShape(int r, int c, Grid g) {
+       grid = g;
+       square = new Square[PIECE_COUNT];
+       ableToMove = true;
+
+       // Create the squares
+       square[0] = new Square(g, r, c - 1, Color.red, true);
+       square[1] = new Square(g, r, c, Color.red, true);
+       square[2] = new Square(g, r + 1, c, Color.red, true);
+       square[3] = new Square(g, r + 1, c + 1, Color.red, true);
+   }
+}
+
+SquareShape.java
+
+import java.awt.Color;
+
+public class SquareShape extends AbstractPiece {
+  
+   public SquareShape(int r, int c, Grid g) {
+       grid = g;
+       square = new Square[PIECE_COUNT];
+       ableToMove = true;
+      
+       // Create the squares
+       square[0] = new Square(g, r, c - 1, Color.gray, true);
+       square[1] = new Square(g, r, c, Color.gray, true);
+       square[2] = new Square(g, r + 1, c - 1, Color.gray, true);
+       square[3] = new Square(g, r + 1, c, Color.gray, true);
+   }
+   @Override
+   public void rotate() //override, do nothing
+   {
+       ;
+   }
+
+}
+
+TShape.java
+
+import java.awt.Color;
+
+public class TShape extends AbstractPiece {
+  
+   public TShape(int r, int c, Grid g) {
+       grid = g;
+       square = new Square[PIECE_COUNT];
+       ableToMove = true;
+
+       // Create the squares
+       square[0] = new Square(g, r, c - 1, Color.yellow, true);
+       square[1] = new Square(g, r, c, Color.yellow, true);
+       square[2] = new Square(g, r, c + 1, Color.yellow, true);
+       square[3] = new Square(g, r + 1, c, Color.yellow, true);
+   }
+
+}
+SShape.java
+
+import java.awt.Color;
+
+public class SShape extends AbstractPiece {
+  
+   public SShape(int r, int c, Grid g) {
+       grid = g;
+       square = new Square[PIECE_COUNT];
+       ableToMove = true;
+
+       // Create the squares
+       square[0] = new Square(g, r, c - 1, Color.green, true);
+       square[1] = new Square(g, r, c, Color.green, true);
+       square[2] = new Square(g, r + 1, c, Color.green, true);
+       square[3] = new Square(g, r + 1, c + 1, Color.green, true);
+   }
+
+}
+
+EventController.java
+
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
+import java.awt.event.KeyAdapter;
+import java.awt.event.KeyEvent;
+
+import javax.swing.JFrame;
+import javax.swing.Timer;
+
+public class EventController extends KeyAdapter implements ActionListener {
+
+   private Game game; // current game: grid and current piece
+   private Timer timer;
+
+   private static final double PIECE_MOVE_TIME = 0.8; // wait 0.8 s every time
+                                                       // the piece moves down
+                                                       // increase to slow it
+                                                       // down
+
+   private boolean gameOver;
+
+   public EventController(Game game) {
+       this.game = game;
+       gameOver = false;
+       double delay = 1000 * PIECE_MOVE_TIME; // in milliseconds
+       timer = new Timer((int) delay, this);
+       timer.setCoalesce(true); // if multiple events pending, bunch them to
+       // 1 event
+       timer.start();
+   }
+
+   public void keyPressed(KeyEvent e) {
+       // if 'Q', quit the game
+       if (e.getKeyCode() == KeyEvent.VK_Q) {
+           timer.stop();
+           ((JFrame) e.getSource()).dispose();
+       }
+       if (!gameOver) {
+           switch (e.getKeyCode()) {
+           case KeyEvent.VK_DOWN:
+               handleMove(Direction.DOWN);
+               break;
+            case KeyEvent.VK_LEFT:
+                handleMove(Direction.LEFT);
+               break;
+            case KeyEvent.VK_RIGHT:
+                handleMove(Direction.RIGHT);
+               break;
+            case KeyEvent.VK_UP:
+               game.rotatePiece();
+               break;
+           case KeyEvent.VK_SPACE:
+               game.rotatePiece();
+               break;
+           }
+       }
+   }
+
+   /** Updates the game periodically based on a timer event */
+   public void actionPerformed(ActionEvent e) {
+       handleMove(Direction.DOWN);
+   }
+
+   private void handleMove(Direction direction) {
+       game.movePiece(direction);
+       gameOver = game.isGameOver();
+       if (gameOver)
+           timer.stop();
+   }
+}
